@@ -1,7 +1,7 @@
 
-{{ config(materialized='table') }}
+with
 
-with orders as (
+orders as (
 
     select * from {{ ref('stg_orders') }}
 
@@ -25,9 +25,16 @@ locations as (
 
 ),
 
+supplies as (
+
+    select * from {{ ref('stg_supplies') }}
+
+),
+
 order_items_summary as (
 
     select
+
         order_id,
 
         sum(products.is_food_item) as count_food_items,
@@ -40,6 +47,22 @@ order_items_summary as (
 
     from order_items
     join products using (product_id)
+
+    group by 1
+
+),
+
+order_supplies_summary as (
+
+    select
+
+        order_id,
+
+        sum(supplies.supply_cost) as order_cost
+
+    from order_items
+    join supplies using (product_id)
+
     group by 1
 
 ),
@@ -47,6 +70,7 @@ order_items_summary as (
 joined as (
 
     select
+
         orders.*,
 
         order_items_summary.count_food_items,
@@ -56,6 +80,8 @@ joined as (
         order_items_summary.subtotal_drink_items,
         order_items_summary.subtotal_food_items,
         order_items_summary.subtotal,
+
+        order_supplies_summary.order_cost,
 
         -- rank this order for the customer
         row_number() over (
@@ -67,13 +93,16 @@ joined as (
 
     from orders
     join order_items_summary using (order_id)
+    join order_supplies_summary using (order_id)
     join locations using (location_id)
 
 ),
 
 final as (
 
-    select *,
+    select 
+        
+        *,
         customer_order_index = 1 as is_first_order,
         count_food_items > 0 as is_food_order,
         count_drink_items > 0 as is_drink_order
