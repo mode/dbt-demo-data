@@ -24,5 +24,6 @@ vars:
 
 models:
   demo_data:
+    +schema: ecommerce_mart
     marts:
       +materialized: table
